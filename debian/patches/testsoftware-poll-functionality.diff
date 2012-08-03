@@ -1,0 +1,91 @@
+Index: python-dns/tests/test_poll.py
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ python-dns/tests/test_poll.py	2016-11-07 15:19:12.928378717 +0100
+@@ -0,0 +1,86 @@
++#!/usr/bin/python
++
++"""
++
++This software is testing poll() functionality.
++
++test cases:
++Timeout:
++tcp:
++nc -lk -w 10 127.0.0.1 1154
++python ./python_dns_test.py 127.0.0.1 1154 tcp 1
++
++udp:
++nc -lku -w 10 127.0.0.1 1154
++python ./python_dns_test.py 127.0.0.1 1154 udp 1
++
++Connection error:
++1.
++tcp:
++python ./python_dns_test.py 127.0.0.1 1155 tcp 10
++
++udp:
++python ./python_dns_test.py 127.0.0.1 1155 udp 10
++2.
++tcp:
++nc -lk -w 1 127.0.0.1 1154
++python ./python_dns_test.py 127.0.0.1 1154 tcp 5
++
++udp:
++nc -lku -w 1 127.0.0.1 1154
++python ./python_dns_test.py 127.0.0.1 1154 udp 5
++
++
++Working:
++tcp:
++python ./python_dns_test.py 10.10.0.1 53 tcp 5
++
++udp:
++python ./python_dns_test.py 10.10.0.1 53 udp 5
++
++"""
++
++
++import DNS
++import sys
++
++def _resolve(host, server, port, proto, timeout):
++        params={}
++        params["server"] = server
++        params["qtype"] = "A"
++        params["name"] = host
++        params["protocol"] = proto
++        params["port"] = int(port)
++        params["timeout"] = int(timeout)
++
++        r = DNS.DnsRequest(**params)
++        a = r.req()
++
++        addr = None
++        cname = None
++        i = 0
++        while (not addr) and (i < len(a.answers)):
++            if (a.answers[i]["typename"] == "A"):
++                addr = a.answers[i]["data"]
++            elif (a.answers[i]["typename"] == "CNAME"):
++                cname = a.answers[i]["data"]
++
++            i += 1
++
++        if (not addr) and (cname):
++            return _resolve(cname, port)
++
++        return addr
++
++
++if (len(sys.argv) > 2):
++    fs = []
++
++    for i in xrange(1,1200):
++        f = open("/etc/passwd","r")
++        fs = fs + [f]
++
++    addr = _resolve("www.index.hu",sys.argv[1],sys.argv[2],sys.argv[3],sys.argv[4])
++    print "addr:", addr
++else:
++    print "test_poll.py <server:ip> <port> <proto:udp|tcp> <timeout in sec>"

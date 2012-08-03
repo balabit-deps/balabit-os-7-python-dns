@@ -3,3 +3,4 @@ pydns_timeout.patch
 examples-interpreter.diff
 select-to-poll.diff
 poll-to-processtcpreply.diff
+testsoftware-poll-functionality.diff
