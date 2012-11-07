@@ -4,3 +4,4 @@ examples-interpreter.diff
 select-to-poll.diff
 poll-to-processtcpreply.diff
 testsoftware-poll-functionality.diff
+automated-unittest-for-dns-lookup.diff

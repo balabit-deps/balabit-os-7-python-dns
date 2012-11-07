@@ -1,0 +1,201 @@
+Index: python-dns/tests/test_poll.py
+===================================================================
+--- python-dns.orig/tests/test_poll.py	2016-11-07 15:19:23.192396772 +0100
++++ python-dns/tests/test_poll.py	2016-11-07 15:19:23.252396877 +0100
+@@ -1,86 +1,102 @@
+ #!/usr/bin/python
+ 
+-"""
+-
+-This software is testing poll() functionality.
+-
+-test cases:
+-Timeout:
+-tcp:
+-nc -lk -w 10 127.0.0.1 1154
+-python ./python_dns_test.py 127.0.0.1 1154 tcp 1
+-
+-udp:
+-nc -lku -w 10 127.0.0.1 1154
+-python ./python_dns_test.py 127.0.0.1 1154 udp 1
+-
+-Connection error:
+-1.
+-tcp:
+-python ./python_dns_test.py 127.0.0.1 1155 tcp 10
+-
+-udp:
+-python ./python_dns_test.py 127.0.0.1 1155 udp 10
+-2.
+-tcp:
+-nc -lk -w 1 127.0.0.1 1154
+-python ./python_dns_test.py 127.0.0.1 1154 tcp 5
+-
+-udp:
+-nc -lku -w 1 127.0.0.1 1154
+-python ./python_dns_test.py 127.0.0.1 1154 udp 5
++import sys
++sys.path.insert(0, '..')
++from DNS import *
+ 
++ParseResolvConf()
+ 
+-Working:
+-tcp:
+-python ./python_dns_test.py 10.10.0.1 53 tcp 5
++import subprocess
++import unittest
+ 
+-udp:
+-python ./python_dns_test.py 10.10.0.1 53 udp 5
+ 
+-"""
++class DNSPollTest(unittest.TestCase):
++    domain_name = "hapci.balabit"
++    netcat_server_port = 1154
++
++    def __resolve_domain_name(self, host, server, port, protocol, timeout):
++            params={}
++            params["server"] = server
++            params["qtype"] = "A"
++            params["name"] = host
++            params["protocol"] = protocol
++            params["port"] = int(port)
++            params["timeout"] = int(timeout)
++
++            r = DNS.DnsRequest(**params)
++            a = r.req()
++
++            addr = None
++            cname = None
++            i = 0
++            while not addr and i < len(a.answers):
++                if (a.answers[i]["typename"] == "A"):
++                    addr = a.answers[i]["data"]
++                elif (a.answers[i]["typename"] == "CNAME"):
++                    cname = a.answers[i]["data"]
++                i += 1
++
++            if not addr and cname:
++                return self.__resolve_domain_name(cname, port)
++
++            return addr
++
++    def __poll_with_more_than_1024_open_fds(self, domain_name, server, port, protocol, timeout):
++        fs = []
++        for i in xrange(1,1200):
++            f = open("/etc/passwd","r")
++            fs = fs + [f]
++
++        return self.__resolve_domain_name(domain_name, server, port, protocol, timeout)
++
++    def __grep_command_self_match_found(self, line):
++        if "grep" in line:
++            return True
++        return False
++
++    def __kill_local_netcat_process(self):
++        import os
++        import signal
++        netcat_cmd = "nc"
++        p = subprocess.Popen(['ps ax | grep ' + netcat_cmd + ' | grep ' + str(self.netcat_server_port)], shell=True, stdout=subprocess.PIPE)
++        out, err = p.communicate()
++        for line in out.splitlines():
++            if self.__grep_command_self_match_found(line):
++                continue
++            if netcat_cmd in line:
++                pid = int(line.split()[0])
++                os.kill(pid, signal.SIGKILL)
++                print "Killed nc deamon process\n"
++
++    def setUp(self):
++        self.__kill_local_netcat_process()
++
++    def test_polling_timeout_with_tcp(self):
++        subprocess.Popen(["nc -lk 127.0.0.1 " + str(self.netcat_server_port)], shell=True)
++        self.assertRaises(DNSError, self.__poll_with_more_than_1024_open_fds, self.domain_name, "127.0.0.1", self.netcat_server_port, "tcp", 1)
++
++    def test_polling_timeout_with_udp(self):
++        subprocess.Popen(["nc -lku 127.0.0.1 " + str(self.netcat_server_port)], shell=True)
++        self.assertRaises(DNSError, self.__poll_with_more_than_1024_open_fds, self.domain_name, "127.0.0.1", self.netcat_server_port, "udp", 1)
++
++    def test_polling_connection_error_with_tcp(self):
++        subprocess.Popen(["nc -w 1 127.0.0.1 " + str(self.netcat_server_port)], shell=True)
++        self.assertRaises(DNSError, self.__poll_with_more_than_1024_open_fds, self.domain_name, "127.0.0.1", self.netcat_server_port, "tcp", 5)
++
++        self.assertRaises(DNSError, self.__poll_with_more_than_1024_open_fds, self.domain_name, "10.10.0.1", 1155, "tcp", 10)
++
++    def test_polling_connection_error_with_udp(self):
++        subprocess.Popen(["nc -uw 1 127.0.0.1 " + str(self.netcat_server_port)], shell=True)
++        self.assertRaises(DNSError, self.__poll_with_more_than_1024_open_fds, self.domain_name, "127.0.0.1", self.netcat_server_port, "udp", 5)
++
++        self.assertRaises(DNSError, self.__poll_with_more_than_1024_open_fds, self.domain_name, "10.10.0.1", 1155, "udp", 10)
++
++    def test_polling_works_with_tcp(self):
++        self.assertEqual("10.10.100.1", self.__poll_with_more_than_1024_open_fds(self.domain_name, "10.10.0.1", 53, "tcp", 5))
+ 
++    def test_polling_works_with_udp(self):
++        self.assertEqual("10.10.100.1", self.__poll_with_more_than_1024_open_fds(self.domain_name, "10.10.0.1", 53, "udp", 5))
+ 
+-import DNS
+-import sys
+ 
+-def _resolve(host, server, port, proto, timeout):
+-        params={}
+-        params["server"] = server
+-        params["qtype"] = "A"
+-        params["name"] = host
+-        params["protocol"] = proto
+-        params["port"] = int(port)
+-        params["timeout"] = int(timeout)
+-
+-        r = DNS.DnsRequest(**params)
+-        a = r.req()
+-
+-        addr = None
+-        cname = None
+-        i = 0
+-        while (not addr) and (i < len(a.answers)):
+-            if (a.answers[i]["typename"] == "A"):
+-                addr = a.answers[i]["data"]
+-            elif (a.answers[i]["typename"] == "CNAME"):
+-                cname = a.answers[i]["data"]
+-
+-            i += 1
+-
+-        if (not addr) and (cname):
+-            return _resolve(cname, port)
+-
+-        return addr
+-
+-
+-if (len(sys.argv) > 2):
+-    fs = []
+-
+-    for i in xrange(1,1200):
+-        f = open("/etc/passwd","r")
+-        fs = fs + [f]
+-
+-    addr = _resolve("www.index.hu",sys.argv[1],sys.argv[2],sys.argv[3],sys.argv[4])
+-    print "addr:", addr
+-else:
+-    print "test_poll.py <server:ip> <port> <proto:udp|tcp> <timeout in sec>"
++if __name__ == '__main__':
++    unittest.main()
+Index: python-dns/tests/test_poll.sh
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ python-dns/tests/test_poll.sh	2016-11-07 15:19:23.252396877 +0100
+@@ -0,0 +1,12 @@
++#!/bin/bash
++
++ulimit -n 2000
++if [ $? != 0 ]
++then
++    echo
++    echo "Run script as root, please."
++    echo "Detailed error description: Could not set max number of open file descriptors."
++    echo
++    exit 1
++fi
++python test_poll.py
