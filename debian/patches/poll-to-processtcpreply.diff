@@ -1,0 +1,68 @@
+Index: python-dns/DNS/Base.py
+===================================================================
+--- python-dns.orig/DNS/Base.py	2016-11-07 15:19:03.136361497 +0100
++++ python-dns/DNS/Base.py	2016-11-07 15:19:03.184361582 +0100
+@@ -112,9 +112,9 @@
+     def socketInit(self,a,b):
+         self.s = socket.socket(a,b)
+ 
+-    def processUDPReply(self):
++    def processSocketReply(self):
+         timeout = 0
+-        if self.timeout > 0:
++        if (type(self.timeout) is int) and (self.timeout > 0):
+             timeout = self.timeout*1000
+         poller = select.poll()
+         poller.register(self.s, select.POLLIN | select.POLLPRI | select.POLLHUP | select.POLLERR)
+@@ -123,16 +123,20 @@
+             raise DNSError, 'Timeout'
+         for fd, flag in events:
+             if flag & (select.POLLIN | select.POLLPRI):
+-                (self.reply, self.from_address) = self.s.recvfrom(65535)
++                poller.unregister(self.s)
++                return
+             elif flag & select.POLLHUP:
+                 poller.unregister(self.s)
+                 raise DNSError, 'POLLHUP'
+             elif flag & select.POLLERR:
+                 poller.unregister(self.s)
+                 raise DNSError, 'POLLERR'
+-                poller.unregister(self.s)
+         poller.unregister(self.s)
+ 
++    def processUDPReply(self):
++        self.processSocketReply()
++
++        (self.reply, self.from_address) = self.s.recvfrom(65535)
+         self.time_finish=time.time()
+         self.args['server']=self.ns
+         return self.processReply()
+@@ -152,16 +156,18 @@
+       return res
+ 
+     def processTCPReply(self):
+-        if self.timeout > 0:
+-            self.s.settimeout(self.timeout)
+-        else:
+-            self.s.settimeout(None)
+-        f = self.s.makefile('rb')
+-        try:
+-          header = self._readall(f,2)
+-          count = Lib.unpack16bit(header)
+-          self.reply = self._readall(f,count)
+-        finally: f.close()
++        self.processSocketReply()
++
++        f = self.s.makefile('r')
++        header = f.read(2)
++        if len(header) < 2:
++            raise DNSError,'EOF'
++        count = Lib.unpack16bit(header)
++        self.reply = f.read(count)
++        if len(self.reply) != count:
++            # FIXME: Since we are non-blocking, it could just be a large reply
++            # that we need to loop and wait for.
++            raise DNSError,'incomplete reply'
+         self.time_finish=time.time()
+         self.args['server']=self.ns
+         return self.processReply()
