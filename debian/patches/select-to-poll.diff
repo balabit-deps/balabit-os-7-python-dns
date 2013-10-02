@@ -1,0 +1,35 @@
+Index: python-dns/DNS/Base.py
+===================================================================
+--- python-dns.orig/DNS/Base.py	2016-11-07 15:18:52.892343485 +0100
++++ python-dns/DNS/Base.py	2016-11-07 15:18:52.940343570 +0100
+@@ -113,11 +113,26 @@
+         self.s = socket.socket(a,b)
+ 
+     def processUDPReply(self):
++        timeout = 0
+         if self.timeout > 0:
+-            r,w,e = select.select([self.s],[],[],self.timeout)
+-            if not len(r):
+-                raise TimeoutError, 'Timeout'
+-        (self.reply, self.from_address) = self.s.recvfrom(65535)
++            timeout = self.timeout*1000
++        poller = select.poll()
++        poller.register(self.s, select.POLLIN | select.POLLPRI | select.POLLHUP | select.POLLERR)
++        events = poller.poll(timeout)
++        if not events:
++            raise DNSError, 'Timeout'
++        for fd, flag in events:
++            if flag & (select.POLLIN | select.POLLPRI):
++                (self.reply, self.from_address) = self.s.recvfrom(65535)
++            elif flag & select.POLLHUP:
++                poller.unregister(self.s)
++                raise DNSError, 'POLLHUP'
++            elif flag & select.POLLERR:
++                poller.unregister(self.s)
++                raise DNSError, 'POLLERR'
++                poller.unregister(self.s)
++        poller.unregister(self.s)
++
+         self.time_finish=time.time()
+         self.args['server']=self.ns
+         return self.processReply()
