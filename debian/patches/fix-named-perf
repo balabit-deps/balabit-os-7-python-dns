@@ -1,0 +1,41 @@
+See Debian #694785
+Patch by Scott Kitterman, <scott@kitterman.com>
+Date: 2014-02-17
+
+Index: python-dns-2.3.6/tools/named-perf.py
+===================================================================
+--- python-dns-2.3.6.orig/tools/named-perf.py	2001-07-19 02:43:15.000000000 -0400
++++ python-dns-2.3.6/tools/named-perf.py	2014-02-17 01:16:28.104483559 -0500
+@@ -18,7 +18,7 @@
+ rpts = 5
+ 
+ def main():
+-	import DNS, timing, socket, time
++	import DNS, socket, time
+ 	res = {}
+ 	for server in servers:
+ 	    res[server] = [100000,0,0,0] # min,max,tot,failed
+@@ -27,12 +27,12 @@
+ 		for server in servers:
+ 		    d = DNS.DnsRequest(server=server,timeout=1)
+ 		    fail = 0
+-		    timing.start()
++		    timingstart = time.time()
+ 		    try:
+ 			r=d.req(name=what,qtype=querytype)
+ 		    except DNS.Error:
+ 			fail = 1
+-		    timing.finish()
++		    timingfinish = time.time()
+ 		    if fail:
+ 			res[server][3] =  res[server][3] + 1
+ 			print "(failed)",res[server][3]
+@@ -40,7 +40,7 @@
+ 		      if r.header['ancount'] == 0:
+ 			print "WARNING: Server",server,"got no answers for", \
+ 				what, querytype
+-		    t = timing.milli()
++		    t = int(1000 * (timingfinish - timingstart))
+ 		    print server,"took",t,"ms for",what,querytype
+ 		    res[server][0] = min(t,res[server][0])
+ 		    res[server][1] = max(t,res[server][1])

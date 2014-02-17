@@ -1,0 +1,30 @@
+Sent upstream Aug 8, 2013
+http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=718547
+Index: python-dns-2.3.6/DNS/Base.py
+===================================================================
+--- python-dns-2.3.6.orig/DNS/Base.py	2013-08-06 22:58:40.830642636 -0400
++++ python-dns-2.3.6/DNS/Base.py	2013-08-06 22:59:20.570641461 -0400
+@@ -276,6 +276,11 @@
+                 # servers worked:
+                 first_socket_error = first_socket_error or e
+                 continue
++            except TimeoutError, t:
++                first_socket_error = first_socket_error or t
++                continue
++            if self.response:
++                break
+         if not self.response and first_socket_error:
+             raise first_socket_error
+ 
+@@ -313,6 +318,11 @@
+             except socket.error, e:
+                 first_socket_error = first_socket_error or e
+                 continue
++            except TimeoutError, t:
++                first_socket_error = first_socket_error or t
++                continue
++            if self.response:
++                break
+         if not self.response and first_socket_error:
+             raise first_socket_error
+ 

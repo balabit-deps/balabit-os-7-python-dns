@@ -1,0 +1,8 @@
+tests/test.py
+tests/test2.py
+tests/test4.py
+tests/test5.py
+tests/testPackers.py
+tests/testsrv.py
+tools/caching.py
+tools/named-perf.py
