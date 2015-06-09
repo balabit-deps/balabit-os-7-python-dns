@@ -1,0 +1,67 @@
+Index: python-dns/DNS/Base.py
+===================================================================
+--- python-dns.orig/DNS/Base.py	2016-11-07 15:19:33.648415168 +0100
++++ python-dns/DNS/Base.py	2016-11-07 15:19:33.692415245 +0100
+@@ -261,7 +261,7 @@
+ 
+     def sendUDPRequest(self, server):
+         "refactor me"
+-        first_socket_error = None
++        first_error = None
+         self.response=None
+         for self.ns in server:
+             #print "trying udp",self.ns
+@@ -291,23 +291,22 @@
+                 finally:
+                     if not self.async:
+                         self.s.close()
+-            except socket.error, e:
++            except Exception as e:
+                 # Keep trying more nameservers, but preserve the first error
+                 # that occurred so it can be reraised in case none of the
+                 # servers worked:
+-                first_socket_error = first_socket_error or e
+-                continue
+-            except TimeoutError, t:
+-                first_socket_error = first_socket_error or t
++                first_error = first_error or e
+                 continue
++
+             if self.response:
+                 break
+-        if not self.response and first_socket_error:
+-            raise first_socket_error
++
++        if not self.response and first_error:
++            raise first_error
+ 
+     def sendTCPRequest(self, server):
+         " do the work of sending a TCP request "
+-        first_socket_error = None
++        first_error = None
+         self.response=None
+         for self.ns in server:
+             #print "trying tcp",self.ns
+@@ -336,16 +335,15 @@
+                         break
+                 finally:
+                     self.s.close()
+-            except socket.error, e:
+-                first_socket_error = first_socket_error or e
+-                continue
+-            except TimeoutError, t:
+-                first_socket_error = first_socket_error or t
++            except Exception as e:
++                first_error = first_error or e
+                 continue
++
+             if self.response:
+                 break
+-        if not self.response and first_socket_error:
+-            raise first_socket_error
++
++        if not self.response and first_error:
++            raise first_error
+ 
+ #class DnsAsyncRequest(DnsRequest):
+ class DnsAsyncRequest(DnsRequest,asyncore.dispatcher_with_send):

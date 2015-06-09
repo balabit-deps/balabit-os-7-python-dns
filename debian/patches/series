@@ -5,3 +5,4 @@ select-to-poll.diff
 poll-to-processtcpreply.diff
 testsoftware-poll-functionality.diff
 automated-unittest-for-dns-lookup.diff
+try-all-remaining-dns-servers.diff
